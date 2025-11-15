@@ -1,0 +1,6 @@
+@ArcusTel.PortalClientes.Api_HostAddress = http://localhost:5109
+
+GET {{ArcusTel.PortalClientes.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
