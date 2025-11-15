@@ -19,13 +19,13 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PartnerResponseLog>>> GetPartnerResponseLog()
         {
-            return await _context.PartnerResponseLog.ToListAsync();
+            return await _context.TB_PartnerResponseLog.ToListAsync();
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<PartnerResponseLog>> GetPartnerResponseLog(long id)
         {
-            var partnerResponseLog = await _context.PartnerResponseLog.FindAsync(id);
+            var partnerResponseLog = await _context.TB_PartnerResponseLog.FindAsync(id);
 
             if (partnerResponseLog == null)
             {
@@ -67,7 +67,7 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<PartnerResponseLog>> PostPartnerResponseLog(PartnerResponseLog partnerResponseLog)
         {
-            _context.PartnerResponseLog.Add(partnerResponseLog);
+            _context.TB_PartnerResponseLog.Add(partnerResponseLog);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetPartnerResponseLog", new { id = partnerResponseLog.LogId }, partnerResponseLog);
@@ -76,13 +76,13 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePartnerResponseLog(long id)
         {
-            var partnerResponseLog = await _context.PartnerResponseLog.FindAsync(id);
+            var partnerResponseLog = await _context.TB_PartnerResponseLog.FindAsync(id);
             if (partnerResponseLog == null)
             {
                 return NotFound();
             }
 
-            _context.PartnerResponseLog.Remove(partnerResponseLog);
+            _context.TB_PartnerResponseLog.Remove(partnerResponseLog);
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -90,7 +90,7 @@ namespace ArcusTel.PortalClientes.Api.Controllers
 
         private bool PartnerResponseLogExists(long id)
         {
-            return _context.PartnerResponseLog.Any(e => e.LogId == id);
+            return _context.TB_PartnerResponseLog.Any(e => e.LogId == id);
         }
     }
 }

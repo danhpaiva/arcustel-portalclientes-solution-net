@@ -19,13 +19,13 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PartnerStatusMapping>>> GetPartnerStatusMapping()
         {
-            return await _context.PartnerStatusMapping.ToListAsync();
+            return await _context.TB_PartnerStatusMapping.ToListAsync();
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<PartnerStatusMapping>> GetPartnerStatusMapping(long id)
         {
-            var partnerStatusMapping = await _context.PartnerStatusMapping.FindAsync(id);
+            var partnerStatusMapping = await _context.TB_PartnerStatusMapping.FindAsync(id);
 
             if (partnerStatusMapping == null)
             {
@@ -67,7 +67,7 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<PartnerStatusMapping>> PostPartnerStatusMapping(PartnerStatusMapping partnerStatusMapping)
         {
-            _context.PartnerStatusMapping.Add(partnerStatusMapping);
+            _context.TB_PartnerStatusMapping.Add(partnerStatusMapping);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetPartnerStatusMapping", new { id = partnerStatusMapping.Id }, partnerStatusMapping);
@@ -76,13 +76,13 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePartnerStatusMapping(long id)
         {
-            var partnerStatusMapping = await _context.PartnerStatusMapping.FindAsync(id);
+            var partnerStatusMapping = await _context.TB_PartnerStatusMapping.FindAsync(id);
             if (partnerStatusMapping == null)
             {
                 return NotFound();
             }
 
-            _context.PartnerStatusMapping.Remove(partnerStatusMapping);
+            _context.TB_PartnerStatusMapping.Remove(partnerStatusMapping);
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -90,7 +90,7 @@ namespace ArcusTel.PortalClientes.Api.Controllers
 
         private bool PartnerStatusMappingExists(long id)
         {
-            return _context.PartnerStatusMapping.Any(e => e.Id == id);
+            return _context.TB_PartnerStatusMapping.Any(e => e.Id == id);
         }
     }
 }

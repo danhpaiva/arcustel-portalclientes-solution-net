@@ -19,13 +19,13 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<DidActivationRequest>>> GetDidActivationRequest()
         {
-            return await _context.DidActivationRequest.ToListAsync();
+            return await _context.TB_DidActivationRequest.ToListAsync();
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<DidActivationRequest>> GetDidActivationRequest(long id)
         {
-            var didActivationRequest = await _context.DidActivationRequest.FindAsync(id);
+            var didActivationRequest = await _context.TB_DidActivationRequest.FindAsync(id);
 
             if (didActivationRequest == null)
             {
@@ -67,7 +67,7 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<DidActivationRequest>> PostDidActivationRequest(DidActivationRequest didActivationRequest)
         {
-            _context.DidActivationRequest.Add(didActivationRequest);
+            _context.TB_DidActivationRequest.Add(didActivationRequest);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetDidActivationRequest", new { id = didActivationRequest.Id }, didActivationRequest);
@@ -76,13 +76,13 @@ namespace ArcusTel.PortalClientes.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteDidActivationRequest(long id)
         {
-            var didActivationRequest = await _context.DidActivationRequest.FindAsync(id);
+            var didActivationRequest = await _context.TB_DidActivationRequest.FindAsync(id);
             if (didActivationRequest == null)
             {
                 return NotFound();
             }
 
-            _context.DidActivationRequest.Remove(didActivationRequest);
+            _context.TB_DidActivationRequest.Remove(didActivationRequest);
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -90,7 +90,7 @@ namespace ArcusTel.PortalClientes.Api.Controllers
 
         private bool DidActivationRequestExists(long id)
         {
-            return _context.DidActivationRequest.Any(e => e.Id == id);
+            return _context.TB_DidActivationRequest.Any(e => e.Id == id);
         }
     }
 }
