@@ -1,42 +1,57 @@
 ﻿using ArcusTel.PortalClientes.Api.Enum;
+using ArcusTel.PortalClientes.Api.Interface;
 
 namespace ArcusTel.PortalClientes.Api.Helpers;
 
-public static class PartnerStatusHelper
+public class PartnerStatusHelper : IPartnerStatusHelper
 {
-    /// <summary>
-    /// Extrai o status normalizado baseado no parceiro.
-    /// </summary>
-    public static NormalizedStatus ExtractPartnerStatus(string partner, int rawStatus)
+    public DidStatus Map(PartnerId partner, string partnerExternalStatus)
+    {
+        if (int.TryParse(partnerExternalStatus, out var code))
+            return Map(partner, code);
+
+        return DidStatus.CustomerValidationFailure;
+    }
+
+    public DidStatus Map(PartnerId partner, int partnerStatusCode)
     {
         return partner switch
         {
-            "PartnerBrasil" => MapPartnerBrasil(rawStatus),
-            "WorldTel" => MapWorldTel(rawStatus),
-            _ => NormalizedStatus.Failed
+            PartnerId.BrasilConnect => partnerStatusCode switch
+            {
+                0 => DidStatus.Pending,
+                1 => DidStatus.Active,
+                2 => DidStatus.PartnerFailure,
+                _ => DidStatus.CustomerValidationFailure
+            },
+            PartnerId.WorldTel => partnerStatusCode switch
+            {
+                0 => DidStatus.Pending,
+                1 => DidStatus.Active,
+                2 => DidStatus.CustomerValidationFailure,
+                _ => DidStatus.CustomerValidationFailure
+            },
+            _ => DidStatus.CustomerValidationFailure
         };
     }
 
-    private static NormalizedStatus MapPartnerBrasil(int raw)
+    public static string ExtractPartnerStatus(string? status)
     {
-        return raw switch
-        {
-            0 => NormalizedStatus.Pending,
-            1 => NormalizedStatus.Active,
-            2 => NormalizedStatus.Failed,
-            _ => NormalizedStatus.Failed
-        };
-    }
+        if (string.IsNullOrWhiteSpace(status))
+            return "Indisponível";
 
-    private static NormalizedStatus MapWorldTel(int raw)
-    {
-        return raw switch
+        status = status.Trim().ToLowerInvariant();
+
+        return status switch
         {
-            0 => NormalizedStatus.Pending,
-            1 => NormalizedStatus.Active,
-            2 => NormalizedStatus.Failed,
-            _ => NormalizedStatus.Failed
+            "ok" => "Operacional",
+            "online" => "Operacional",
+            "ativo" => "Operacional",
+            "success" => "Operacional",
+            "erro" => "Erro",
+            "error" => "Erro",
+            "offline" => "Offline",
+            _ => status
         };
     }
 }
-

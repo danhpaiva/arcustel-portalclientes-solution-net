@@ -3,70 +3,104 @@ using ArcusTel.PortalClientes.Api.DTO;
 using ArcusTel.PortalClientes.Api.Enum;
 using ArcusTel.PortalClientes.Api.Interface;
 using ArcusTel.PortalClientes.Api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ArcusTel.PortalClientes.Api.Service;
 
 public class DidOrchestrator : IDidOrchestrator
 {
-    private readonly IPartnerClient _brClient;
-    private readonly IPartnerClient _wtClient;
     private readonly AppDbContext _db;
-    private readonly ILogger<DidOrchestrator> _log;
-    private readonly IMapper _mapper; // optional AutoMapper or manual mapping
+    private readonly IPartnerBrasilClient _brClient;
+    private readonly IWorldTelClient _wtClient;
+    private readonly IPartnerStatusHelper _statusHelper;
+    private readonly IPrefixHelper _prefixHelper;
+    private readonly IDidNormalizer _normalizer;
 
-    public DidOrchestrator(IServiceProvider sp, AppDbContext db, ILogger<DidOrchestrator> log)
+    public DidOrchestrator(
+        AppDbContext db,
+        IPartnerBrasilClient brClient,
+        IWorldTelClient wtClient,
+        IPartnerStatusHelper statusHelper,
+        IPrefixHelper prefixHelper,
+        IDidNormalizer normalizer)
     {
-        // resolve by partner
-        _brClient = sp.GetRequiredService<PartnerBrasilClient>();
-        _wtClient = sp.GetRequiredService<WorldTelClient>();
         _db = db;
-        _log = log;
+        _brClient = brClient;
+        _wtClient = wtClient;
+        _statusHelper = statusHelper;
+        _prefixHelper = prefixHelper;
+        _normalizer = normalizer;
     }
 
     public async Task<NormalizedActivationResponse> ActivateAsync(string e164Number, long userId, CancellationToken ct = default)
     {
-        var partner = e164Number.StartsWith("+55") ? PartnerId.PartnerBrasil : PartnerId.WorldTel;
-        IPartnerClient client = partner == PartnerId.PartnerBrasil ? _brClient : _wtClient;
+        var partner = _prefixHelper.IsBrazilian(e164Number) ? PartnerId.BrasilConnect : PartnerId.WorldTel;
 
-        // Persist initial DidActivationRequest
         var request = new DidActivationRequest
         {
             DidNumber = e164Number,
-            PrefixCode = ExtractPrefix(e164Number),
+            PrefixCode = _prefixHelper.ExtractPrefix(e164Number),
             PartnerId = partner,
             RequestDate = DateTimeOffset.UtcNow,
             CurrentStatus = DidStatus.Pending,
-            LastPartnerRawStatus = null!,
             UserId = userId
         };
+
         _db.TB_DidActivationRequest.Add(request);
         await _db.SaveChangesAsync(ct);
 
-        // Call partner
-        var (rawResponse, parsed) = await client.ActivateDidAsync(e164Number, "portal", ct);
-
-        // Map partner status -> internal status
-        var partnerStatus = ExtractPartnerStatus(parsed);
-        var normalized = MapToNormalized(partner, parsed, partnerStatus);
-
-        // Persist PartnerResponseLog
-        var log = new PartnerResponseLog
+        // chama o parceiro correto
+        if (partner == PartnerId.BrasilConnect)
         {
-            RequestId = request.Id,
-            Timestamp = DateTimeOffset.UtcNow,
-            RawResponsePayload = rawResponse,
-            PartnerStatus = partnerStatus,
-            NormalizerOutputStatus = normalized.Status,
-            PartnerDetailMessage = normalized.DetailMessage ?? string.Empty
-        };
-        _db.TB_PartnerResponseLog.Add(log);
+            var partnerResp = await _brClient.ActivateDidAsync(e164Number, userId.ToString(), ct);
+            if (partnerResp == null) throw new Exception("PartnerBrasil returned null");
 
-        // Update request current status & last raw status
-        request.CurrentStatus = normalized.Status;
-        request.LastPartnerRawStatus = partnerStatus;
-        await _db.SaveChangesAsync(ct);
+            var normalized = _normalizer.FromPartnerBrasil(partnerResp);
+            // opcional: se quiser mapear via tabela TB_PartnerStatusMapping, use _statusHelper or DB lookup
+            var mapped = _statusHelper.Map(PartnerId.BrasilConnect, partnerResp.Status);
 
-        return normalized;
+            var log = new PartnerResponseLog
+            {
+                RequestId = request.Id,
+                Timestamp = DateTimeOffset.UtcNow,
+                RawResponsePayload = System.Text.Json.JsonSerializer.Serialize(partnerResp),
+                PartnerStatus = partnerResp.Status.ToString(),
+                NormalizerOutputStatus = mapped,
+                PartnerDetailMessage = partnerResp.ErrorMessage ?? string.Empty
+            };
+            _db.TB_PartnerResponseLog.Add(log);
+
+            request.CurrentStatus = mapped;
+            request.LastPartnerRawStatus = partnerResp.Status.ToString();
+            await _db.SaveChangesAsync(ct);
+
+            return normalized;
+        }
+        else
+        {
+            var partnerResp = await _wtClient.ActivateDidAsync(e164Number, userId.ToString(), ct);
+            if (partnerResp == null) throw new Exception("WorldTel returned null");
+
+            var normalized = _normalizer.FromWorldTel(partnerResp);
+            var mapped = _statusHelper.Map(PartnerId.WorldTel, partnerResp.Status);
+
+            var log = new PartnerResponseLog
+            {
+                RequestId = request.Id,
+                Timestamp = DateTimeOffset.UtcNow,
+                RawResponsePayload = System.Text.Json.JsonSerializer.Serialize(partnerResp),
+                PartnerStatus = partnerResp.Status.ToString(),
+                NormalizerOutputStatus = mapped,
+                PartnerDetailMessage = string.Empty
+            };
+            _db.TB_PartnerResponseLog.Add(log);
+
+            request.CurrentStatus = mapped;
+            request.LastPartnerRawStatus = partnerResp.Status.ToString();
+            await _db.SaveChangesAsync(ct);
+
+            return normalized;
+        }
     }
 
     public async Task<NormalizedActivationResponse> GetStatusAsync(long requestId, CancellationToken ct = default)
@@ -74,29 +108,58 @@ public class DidOrchestrator : IDidOrchestrator
         var req = await _db.TB_DidActivationRequest.FindAsync(new object[] { requestId }, ct);
         if (req == null) throw new KeyNotFoundException("Request not found");
 
-        // Optionally query partner for latest state
-        IPartnerClient client = req.PartnerId == PartnerId.PartnerBrasil ? _brClient : _wtClient;
-        (string raw, object parsed) = await client.GetStatusAsync(req.DidNumber, ct);
-
-        var partnerStatus = ExtractPartnerStatus(parsed);
-        var normalized = MapToNormalized(req.PartnerId, parsed, partnerStatus);
-
-        // persist log & update
-        var log = new PartnerResponseLog
+        // se precisar consultar o parceiro para atualizar status:
+        if (req.PartnerId == PartnerId.BrasilConnect)
         {
-            RequestId = req.Id,
-            Timestamp = DateTimeOffset.UtcNow,
-            RawResponsePayload = raw,
-            PartnerStatus = partnerStatus,
-            NormalizerOutputStatus = normalized.Status,
-            PartnerDetailMessage = normalized.DetailMessage ?? ""
-        };
-        _db.TB_PartnerResponseLog.Add(log);
+            var partnerResp = await _brClient.GetStatusByNumberAsync(req.DidNumber, ct);
+            if (partnerResp == null) throw new Exception("PartnerBrasil get-status returned null");
 
-        req.CurrentStatus = normalized.Status;
-        req.LastPartnerRawStatus = partnerStatus;
-        await _db.SaveChangesAsync(ct);
+            var normalized = _normalizer.FromPartnerBrasil(partnerResp);
+            var mapped = _statusHelper.Map(PartnerId.BrasilConnect, partnerResp.Status);
 
-        return normalized;
+            var log = new PartnerResponseLog
+            {
+                RequestId = req.Id,
+                Timestamp = DateTimeOffset.UtcNow,
+                RawResponsePayload = System.Text.Json.JsonSerializer.Serialize(partnerResp),
+                PartnerStatus = partnerResp.Status.ToString(),
+                NormalizerOutputStatus = mapped,
+                PartnerDetailMessage = partnerResp.ErrorMessage ?? string.Empty
+            };
+            _db.TB_PartnerResponseLog.Add(log);
+
+            req.CurrentStatus = mapped;
+            req.LastPartnerRawStatus = partnerResp.Status.ToString();
+            await _db.SaveChangesAsync(ct);
+
+            return normalized;
+        }
+        else
+        {
+            // WorldTel: preferimos buscar por DidId? seu schema armazena DidNumber — aqui consultamos por número
+            // Se WorldTel exige DidId use campo LastPartnerRawStatus para armazenar e consultar depois.
+            var partnerResp = await _wtClient.GetStatusByDidIdAsync(req.LastPartnerRawStatus ?? req.DidNumber, ct);
+            if (partnerResp == null) throw new Exception("WorldTel get-status returned null");
+
+            var normalized = _normalizer.FromWorldTel(partnerResp);
+            var mapped = _statusHelper.Map(PartnerId.WorldTel, partnerResp.Status);
+
+            var log = new PartnerResponseLog
+            {
+                RequestId = req.Id,
+                Timestamp = DateTimeOffset.UtcNow,
+                RawResponsePayload = System.Text.Json.JsonSerializer.Serialize(partnerResp),
+                PartnerStatus = partnerResp.Status.ToString(),
+                NormalizerOutputStatus = mapped,
+                PartnerDetailMessage = string.Empty
+            };
+            _db.TB_PartnerResponseLog.Add(log);
+
+            req.CurrentStatus = mapped;
+            req.LastPartnerRawStatus = partnerResp.DidId ?? partnerResp.E164Number;
+            await _db.SaveChangesAsync(ct);
+
+            return normalized;
+        }
     }
 }

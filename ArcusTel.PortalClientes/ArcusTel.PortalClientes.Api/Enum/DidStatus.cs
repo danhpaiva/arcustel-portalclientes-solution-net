@@ -18,5 +18,6 @@ public enum DidStatus
     PartnerFailure = 4,
 
     // Falha de Negócio/Validação do Cliente (ex: Documento Inválido)
-    CustomerValidationFailure = 5
+    CustomerValidationFailure = 5,
+    UnknownFailure = 6
 }

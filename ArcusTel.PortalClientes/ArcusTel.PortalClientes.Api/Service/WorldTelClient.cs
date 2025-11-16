@@ -6,59 +6,57 @@ using System.Text.Json;
 
 namespace ArcusTel.PortalClientes.Api.Service;
 
-public class WorldTelClient : IPartnerClient
+public class WorldTelClient : IWorldTelClient
 {
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
     private readonly IMemoryCache _cache;
-    private readonly ILogger<WorldTelClient> _log;
+    private const string CACHE_KEY = "WorldTel_Token";
 
-    public WorldTelClient(HttpClient http, IConfiguration config, IMemoryCache cache, ILogger<WorldTelClient> log)
+    public WorldTelClient(HttpClient http, IConfiguration config, IMemoryCache cache)
     {
-        _http = http; _config = config; _cache = cache; _log = log;
+        _http = http;
+        _config = config;
+        _cache = cache;
     }
 
-    private record TokenInfo(string Token, DateTimeOffset ExpiresAt);
-    private const string CacheKey = "WorldTel_Token";
-
-    public async Task AuthenticateAsync(CancellationToken ct = default)
+    private async Task EnsureAuth(CancellationToken ct)
     {
-        if (_cache.TryGetValue<TokenInfo>(CacheKey, out var info) && info.ExpiresAt > DateTimeOffset.UtcNow.AddSeconds(30))
+        if (_cache.TryGetValue<string>(CACHE_KEY, out var token))
         {
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", info.Token);
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             return;
         }
 
-        var creds = new { username = _config["WorldTel:Username"], password = _config["WorldTel:Password"] };
+        var creds = new { username = _config["Partners:WorldTel:Username"], password = _config["Partners:WorldTel:Password"] };
         var res = await _http.PostAsJsonAsync("/api/Auth/login", creds, ct);
         res.EnsureSuccessStatusCode();
-        var body = await res.Content.ReadFromJsonAsync<WorldTelAuthResponse>(cancellationToken: ct);
-        if (body == null) throw new Exception("WorldTel auth failed");
-        var expires = body.ExpiresAt;
-        _cache.Set(CacheKey, new TokenInfo(body.Token, expires), expires - DateTimeOffset.UtcNow);
+        var raw = await res.Content.ReadAsStringAsync(ct);
+        var body = JsonSerializer.Deserialize<WorldTelAuthResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (body?.Token == null) throw new Exception("WorldTel: token null");
+        var expire = body.ExpiresAt;
+        var ttl = expire - DateTimeOffset.UtcNow;
+        if (ttl <= TimeSpan.Zero) ttl = TimeSpan.FromMinutes(9);
+        _cache.Set(CACHE_KEY, body.Token, ttl);
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.Token);
     }
 
-    public async Task<(string rawResponse, object parsed)> ActivateDidAsync(string e164Number, string requestedBy, CancellationToken ct = default)
+    public async Task<WorldTelActivationResponse?> ActivateDidAsync(string e164Number, string requestedBy, CancellationToken ct = default)
     {
-        await AuthenticateAsync(ct);
-        var payload = new { e164Number = e164Number, createdBy = requestedBy };
+        await EnsureAuth(ct);
+        var payload = new { e164Number, createdBy = requestedBy };
         var res = await _http.PostAsJsonAsync("/api/InternationalDids/from-number", payload, ct);
+        if (!res.IsSuccessStatusCode) return null;
         var raw = await res.Content.ReadAsStringAsync(ct);
-        object parsed = null;
-        try { parsed = JsonSerializer.Deserialize<WorldTelActivationResponse>(raw); } catch { parsed = raw; }
-        return (raw, parsed!);
+        return JsonSerializer.Deserialize<WorldTelActivationResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
-    public async Task<(string rawResponse, object parsed)> GetStatusAsync(string externalIdOrNumber, CancellationToken ct = default)
+    public async Task<WorldTelActivationResponse?> GetStatusByDidIdAsync(string didId, CancellationToken ct = default)
     {
-        await AuthenticateAsync(ct);
-        // Example: GET /api/InternationalDids/{id} or search by didId
-        var res = await _http.GetAsync($"/api/InternationalDids/{externalIdOrNumber}", ct);
+        await EnsureAuth(ct);
+        var res = await _http.GetAsync($"/api/InternationalDids/{Uri.EscapeDataString(didId)}", ct);
+        if (!res.IsSuccessStatusCode) return null;
         var raw = await res.Content.ReadAsStringAsync(ct);
-        object parsed = null;
-        try { parsed = JsonSerializer.Deserialize<WorldTelActivationResponse>(raw); } catch { parsed = raw; }
-        return (raw, parsed!);
+        return JsonSerializer.Deserialize<WorldTelActivationResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 }
-

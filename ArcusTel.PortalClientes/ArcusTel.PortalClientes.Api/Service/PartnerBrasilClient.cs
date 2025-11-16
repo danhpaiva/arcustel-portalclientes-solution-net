@@ -6,57 +6,59 @@ using System.Text.Json;
 
 namespace ArcusTel.PortalClientes.Api.Service;
 
-public class PartnerBrasilClient : IPartnerClient
+public class PartnerBrasilClient : IPartnerBrasilClient
 {
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
     private readonly IMemoryCache _cache;
-    private readonly ILogger<PartnerBrasilClient> _log;
+    private const string TOKEN_CACHE_KEY = "PartnerBrasil_Jwt";
 
-    public PartnerBrasilClient(HttpClient http, IConfiguration config, IMemoryCache cache, ILogger<PartnerBrasilClient> log)
+    public PartnerBrasilClient(HttpClient http, IConfiguration config, IMemoryCache cache)
     {
         _http = http;
         _config = config;
         _cache = cache;
-        _log = log;
     }
 
-    private string AuthCacheKey => "PartnerBrasil_Jwt";
-
-    public async Task AuthenticateAsync(CancellationToken ct = default)
+    private async Task EnsureAuth(CancellationToken ct)
     {
-        if (_cache.TryGetValue<string>(AuthCacheKey, out var tok)) return;
+        if (_cache.TryGetValue<string>(TOKEN_CACHE_KEY, out var token))
+        {
+            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return;
+        }
 
-        var creds = new { username = _config["PartnerBrasil:Username"], password = _config["PartnerBrasil:Password"] };
+        var creds = new { username = _config["Partners:PartnerBrasil:Username"], password = _config["Partners:PartnerBrasil:Password"] };
         var res = await _http.PostAsJsonAsync("/api/auth/login", creds, ct);
         res.EnsureSuccessStatusCode();
-        var body = await res.Content.ReadFromJsonAsync<PartnerBrasilAuthResponse>(cancellationToken: ct);
-        if (body?.Token == null) throw new Exception("PartnerBrasil returned no token");
-        // cache token (no expiry info provided — set sliding expiration short)
-        _cache.Set(AuthCacheKey, body.Token, TimeSpan.FromMinutes(9));
+        var json = await res.Content.ReadAsStringAsync(ct);
+        var body = JsonSerializer.Deserialize<PartnerBrasilAuthResponse>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (body?.Token == null) throw new Exception("PartnerBrasil: token null");
+        _cache.Set(TOKEN_CACHE_KEY, body.Token, TimeSpan.FromMinutes(9));
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.Token);
     }
 
-    public async Task<(string rawResponse, object parsed)> ActivateDidAsync(string e164Number, string requestedBy, CancellationToken ct = default)
+    public async Task<PartnerBrasilActivationResponse?> ActivateDidAsync(string e164Number, string requestedBy, CancellationToken ct = default)
     {
-        await AuthenticateAsync(ct);
+        await EnsureAuth(ct);
         var payload = new { didNumber = e164Number };
         var res = await _http.PostAsJsonAsync("/api/DidActivation/request", payload, ct);
         var raw = await res.Content.ReadAsStringAsync(ct);
-        object parsed = null;
-        try { parsed = JsonSerializer.Deserialize<PartnerBrasilActivationResponse>(raw); } catch { parsed = raw; }
-        return (raw, parsed!);
+        if (!res.IsSuccessStatusCode)
+        {
+            // optional: return a wrapper with error info
+            return null;
+        }
+        return JsonSerializer.Deserialize<PartnerBrasilActivationResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
-    public async Task<(string rawResponse, object parsed)> GetStatusAsync(string externalIdOrNumber, CancellationToken ct = default)
+    public async Task<PartnerBrasilActivationResponse?> GetStatusByNumberAsync(string e164Number, CancellationToken ct = default)
     {
-        await AuthenticateAsync(ct);
-        // Implement according to partner spec (example GET /api/DidActivation/{id} or query by number)
-        var res = await _http.GetAsync($"/api/DidActivation/{externalIdOrNumber}", ct);
+        await EnsureAuth(ct);
+        // Assuming partner has GET by id or query: adapt if different
+        var res = await _http.GetAsync($"/api/DidActivation/request-by-number?didNumber={Uri.EscapeDataString(e164Number)}", ct);
+        if (!res.IsSuccessStatusCode) return null;
         var raw = await res.Content.ReadAsStringAsync(ct);
-        object parsed = null;
-        try { parsed = JsonSerializer.Deserialize<PartnerBrasilActivationResponse>(raw); } catch { parsed = raw; }
-        return (raw, parsed!);
+        return JsonSerializer.Deserialize<PartnerBrasilActivationResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 }
-

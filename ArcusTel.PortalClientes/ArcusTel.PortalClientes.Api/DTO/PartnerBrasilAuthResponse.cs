@@ -1,3 +1,9 @@
-﻿namespace ArcusTel.PortalClientes.Api.DTO;
+﻿using System.Text.Json.Serialization;
 
-public class PartnerBrasilAuthResponse { public string Token { get; set; } }
+namespace ArcusTel.PortalClientes.Api.DTO;
+
+public class PartnerBrasilAuthResponse
+{
+    [JsonPropertyName("token")]
+    public string? Token { get; set; }
+}
