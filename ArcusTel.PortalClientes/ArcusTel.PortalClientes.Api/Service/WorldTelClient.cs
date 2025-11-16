@@ -47,15 +47,49 @@ public class WorldTelClient : IWorldTelClient
 
         var payload = new { e164Number, createdBy = requestedBy };
 
-        var res = await _http.PostAsJsonAsync("/api/InternationalDids/from-number", payload, ct);
-        if (!res.IsSuccessStatusCode)
-            return null;
+        // --- LOG: antes da requisição ---
+        Console.WriteLine($"[WorldTelClient] POST /api/InternationalDids/from-number");
+        Console.WriteLine($"[WorldTelClient] Payload: {JsonSerializer.Serialize(payload)}");
 
+        HttpResponseMessage res;
+        try
+        {
+            res = await _http.PostAsJsonAsync("/api/InternationalDids/from-number", payload, ct);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WorldTelClient] Exception during POST: {ex}");
+            throw;
+        }
+
+        // --- LOG: após a requisição ---
+        Console.WriteLine($"[WorldTelClient] StatusCode: {res.StatusCode}");
         var raw = await res.Content.ReadAsStringAsync(ct);
+        Console.WriteLine($"[WorldTelClient] Response body: {raw}");
 
-        return JsonSerializer.Deserialize<WorldTelActivationResponse>(raw,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (!res.IsSuccessStatusCode)
+        {
+            Console.WriteLine("[WorldTelClient] ActivateDidAsync returning null due to non-success status code.");
+            return null;
+        }
+
+        try
+        {
+            var result = JsonSerializer.Deserialize<WorldTelActivationResponse>(raw,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (result == null)
+                Console.WriteLine("[WorldTelClient] Deserialized result is null!");
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[WorldTelClient] Exception during deserialization: {ex}");
+            throw;
+        }
     }
+
 
     public async Task<WorldTelActivationResponse?> GetStatusByDidIdAsync(string didId, CancellationToken ct = default)
     {

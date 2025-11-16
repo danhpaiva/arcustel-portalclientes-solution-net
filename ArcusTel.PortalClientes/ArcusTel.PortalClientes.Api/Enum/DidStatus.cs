@@ -19,5 +19,6 @@ public enum DidStatus
 
     // Falha de Negócio/Validação do Cliente (ex: Documento Inválido)
     CustomerValidationFailure = 5,
+
     UnknownFailure = 6
 }

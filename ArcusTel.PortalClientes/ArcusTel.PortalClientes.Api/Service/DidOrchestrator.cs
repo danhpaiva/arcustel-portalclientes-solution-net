@@ -54,7 +54,31 @@ public class DidOrchestrator : IDidOrchestrator
         if (partner == PartnerId.BrasilConnect)
         {
             var partnerResp = await _brClient.ActivateDidAsync(e164Number, userId.ToString(), ct);
-            if (partnerResp == null) throw new Exception("PartnerBrasil returned null");
+            if (partnerResp == null)
+            {
+                _db.TB_PartnerResponseLog.Add(new PartnerResponseLog
+                {
+                    RequestId = request.Id,
+                    Timestamp = DateTimeOffset.UtcNow,
+                    RawResponsePayload = "BrasilConnect returned null or conflict",
+                    PartnerStatus = "Conflict",
+                    NormalizerOutputStatus = DidStatus.CustomerValidationFailure,
+                    PartnerDetailMessage = "DID já existe no BrasilConnect ou erro no parceiro"
+                });
+
+                request.CurrentStatus = DidStatus.CustomerValidationFailure;
+                request.LastPartnerRawStatus = "Conflict";
+                await _db.SaveChangesAsync(ct);
+
+                return new NormalizedActivationResponse(
+                        ExternalId: string.Empty,
+                        DidNumber: e164Number,
+                        PartnerId: PartnerId.WorldTel,
+                        Status: DidStatus.CustomerValidationFailure,
+                        DetailMessage: "DID já existe no BrasilConnect ou erro no parceiro",
+                        CreatedAt: DateTimeOffset.UtcNow
+                        );
+            }
 
             var normalized = _normalizer.FromPartnerBrasil(partnerResp);
             var mapped = _statusHelper.Map(PartnerId.BrasilConnect, partnerResp.Status);
@@ -79,7 +103,31 @@ public class DidOrchestrator : IDidOrchestrator
         else
         {
             var partnerResp = await _wtClient.ActivateDidAsync(e164Number, userId.ToString(), ct);
-            if (partnerResp == null) throw new Exception("WorldTel returned null");
+            if (partnerResp == null)
+            {
+                _db.TB_PartnerResponseLog.Add(new PartnerResponseLog
+                {
+                    RequestId = request.Id,
+                    Timestamp = DateTimeOffset.UtcNow,
+                    RawResponsePayload = "WorldTel returned null or conflict",
+                    PartnerStatus = "Conflict",
+                    NormalizerOutputStatus = DidStatus.CustomerValidationFailure,
+                    PartnerDetailMessage = "DID já existe ou erro no parceiro"
+                });
+
+                request.CurrentStatus = DidStatus.CustomerValidationFailure;
+                request.LastPartnerRawStatus = "Conflict";
+                await _db.SaveChangesAsync(ct);
+
+                return new NormalizedActivationResponse(
+                        ExternalId: string.Empty,
+                        DidNumber: e164Number,
+                        PartnerId: PartnerId.WorldTel,
+                        Status: DidStatus.CustomerValidationFailure,
+                        DetailMessage: "DID já existe no WorldTel",
+                        CreatedAt: DateTimeOffset.UtcNow
+                        );
+            }
 
             var normalized = _normalizer.FromWorldTel(partnerResp);
             var mapped = _statusHelper.Map(PartnerId.WorldTel, partnerResp.Status);

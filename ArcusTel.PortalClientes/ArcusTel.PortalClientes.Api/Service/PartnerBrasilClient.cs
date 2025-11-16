@@ -46,7 +46,6 @@ public class PartnerBrasilClient : IPartnerBrasilClient
         var raw = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
         {
-            // optional: return a wrapper with error info
             return null;
         }
         return JsonSerializer.Deserialize<PartnerBrasilActivationResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -55,7 +54,6 @@ public class PartnerBrasilClient : IPartnerBrasilClient
     public async Task<PartnerBrasilActivationResponse?> GetStatusByNumberAsync(string e164Number, CancellationToken ct = default)
     {
         await EnsureAuth(ct);
-        // Assuming partner has GET by id or query: adapt if different
         var res = await _http.GetAsync($"/api/DidActivation/request-by-number?didNumber={Uri.EscapeDataString(e164Number)}", ct);
         if (!res.IsSuccessStatusCode) return null;
         var raw = await res.Content.ReadAsStringAsync(ct);

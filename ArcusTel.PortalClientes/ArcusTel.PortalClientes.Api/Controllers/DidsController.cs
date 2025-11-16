@@ -15,6 +15,7 @@ public class DidsController : ControllerBase
         _orchestrator = orchestrator;
     }
 
+    [HttpPost("activate")]
     public async Task<IActionResult> Activate([FromBody] ActivateDidRequest dto, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(dto.E164Number))
