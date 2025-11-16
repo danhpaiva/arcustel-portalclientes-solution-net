@@ -39,9 +39,6 @@ builder.Services.AddScoped<IPartnerStatusHelper, PartnerStatusHelper>();
 builder.Services.AddScoped<IDidNormalizer, DidNormalizer>();
 builder.Services.AddScoped<IPrefixHelper, PrefixHelper>();
 
-builder.Services.AddScoped<IPartnerBrasilClient, PartnerBrasilClient>();
-builder.Services.AddScoped<IWorldTelClient, WorldTelClient>();
-
 builder.Services.AddScoped<IDidOrchestrator, DidOrchestrator>();
 
 builder.Services.AddOpenApi();

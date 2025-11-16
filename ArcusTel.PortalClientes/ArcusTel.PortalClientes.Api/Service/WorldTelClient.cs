@@ -44,19 +44,31 @@ public class WorldTelClient : IWorldTelClient
     public async Task<WorldTelActivationResponse?> ActivateDidAsync(string e164Number, string requestedBy, CancellationToken ct = default)
     {
         await EnsureAuth(ct);
+
         var payload = new { e164Number, createdBy = requestedBy };
+
         var res = await _http.PostAsJsonAsync("/api/InternationalDids/from-number", payload, ct);
-        if (!res.IsSuccessStatusCode) return null;
+        if (!res.IsSuccessStatusCode)
+            return null;
+
         var raw = await res.Content.ReadAsStringAsync(ct);
-        return JsonSerializer.Deserialize<WorldTelActivationResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        return JsonSerializer.Deserialize<WorldTelActivationResponse>(raw,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
     public async Task<WorldTelActivationResponse?> GetStatusByDidIdAsync(string didId, CancellationToken ct = default)
     {
         await EnsureAuth(ct);
+
         var res = await _http.GetAsync($"/api/InternationalDids/{Uri.EscapeDataString(didId)}", ct);
-        if (!res.IsSuccessStatusCode) return null;
+        if (!res.IsSuccessStatusCode)
+            return null;
+
         var raw = await res.Content.ReadAsStringAsync(ct);
-        return JsonSerializer.Deserialize<WorldTelActivationResponse>(raw, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        return JsonSerializer.Deserialize<WorldTelActivationResponse>(raw,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
+
 }
