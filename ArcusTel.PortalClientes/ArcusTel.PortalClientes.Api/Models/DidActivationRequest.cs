@@ -7,6 +7,7 @@ namespace ArcusTel.PortalClientes.Api.Models;
 public class DidActivationRequest
 {
     [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public long Id { get; set; }
 
     public string DidNumber { get; set; }

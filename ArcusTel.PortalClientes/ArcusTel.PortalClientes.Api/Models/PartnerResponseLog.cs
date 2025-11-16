@@ -7,6 +7,7 @@ namespace ArcusTel.PortalClientes.Api.Models;
 public class PartnerResponseLog
 {
     [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public long LogId { get; set; }
 
     [ForeignKey("DidActivationRequest")]

@@ -1,7 +1,13 @@
-﻿namespace ArcusTel.PortalClientes.Api.Models;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace ArcusTel.PortalClientes.Api.Models;
 
 public class DidOrchestratorResponse
 {
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public long Id { get; set; }
     public bool Success { get; set; }
     public string? Message { get; set; }
 
