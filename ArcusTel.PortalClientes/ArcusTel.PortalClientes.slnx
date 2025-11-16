@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ArcusTel.PortalClientes.Api/ArcusTel.PortalClientes.Api.csproj" />
+  <Project Path="ArcusTel.PortalClientes.Tests/ArcusTel.PortalClientes.Api.Tests.csproj" Id="26431477-d93f-4b33-b699-569331f0de9f" />
+</Solution>
