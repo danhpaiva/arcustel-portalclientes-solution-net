@@ -15,7 +15,7 @@ public class DidActivationRequest
     public PartnerId PartnerId { get; set; }
     public DateTimeOffset RequestDate { get; set; }
     public DidStatus CurrentStatus { get; set; }
-    public string LastPartnerRawStatus { get; set; }
+    public string? LastPartnerRawStatus { get; set; }
 
     [ForeignKey("User")]
     public long UserId { get; set; }

@@ -43,20 +43,20 @@ public class DidOrchestrator : IDidOrchestrator
             PartnerId = partner,
             RequestDate = DateTimeOffset.UtcNow,
             CurrentStatus = DidStatus.Pending,
-            UserId = userId
+            UserId = userId,
+            LastPartnerRawStatus = "Pending"
         };
+
 
         _db.TB_DidActivationRequest.Add(request);
         await _db.SaveChangesAsync(ct);
 
-        // chama o parceiro correto
         if (partner == PartnerId.BrasilConnect)
         {
             var partnerResp = await _brClient.ActivateDidAsync(e164Number, userId.ToString(), ct);
             if (partnerResp == null) throw new Exception("PartnerBrasil returned null");
 
             var normalized = _normalizer.FromPartnerBrasil(partnerResp);
-            // opcional: se quiser mapear via tabela TB_PartnerStatusMapping, use _statusHelper or DB lookup
             var mapped = _statusHelper.Map(PartnerId.BrasilConnect, partnerResp.Status);
 
             var log = new PartnerResponseLog
@@ -108,7 +108,6 @@ public class DidOrchestrator : IDidOrchestrator
         var req = await _db.TB_DidActivationRequest.FindAsync(new object[] { requestId }, ct);
         if (req == null) throw new KeyNotFoundException("Request not found");
 
-        // se precisar consultar o parceiro para atualizar status:
         if (req.PartnerId == PartnerId.BrasilConnect)
         {
             var partnerResp = await _brClient.GetStatusByNumberAsync(req.DidNumber, ct);
@@ -136,8 +135,6 @@ public class DidOrchestrator : IDidOrchestrator
         }
         else
         {
-            // WorldTel: preferimos buscar por DidId? seu schema armazena DidNumber — aqui consultamos por número
-            // Se WorldTel exige DidId use campo LastPartnerRawStatus para armazenar e consultar depois.
             var partnerResp = await _wtClient.GetStatusByDidIdAsync(req.LastPartnerRawStatus ?? req.DidNumber, ct);
             if (partnerResp == null) throw new Exception("WorldTel get-status returned null");
 
