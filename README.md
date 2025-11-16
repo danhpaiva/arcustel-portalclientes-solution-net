@@ -31,8 +31,8 @@ O repositório contém a **ArcusTel.PortalClientes.Api**, uma API ASP.NET Core r
 A API permite:
 
 1. **Ativar DIDs**  
-   - Nacionais (+55) via **BrasilConnect**  
-   - Internacionais via **WorldTel**  
+   - Nacionais (+55) via [**BrasilConnect**](https://github.com/danhpaiva/partner-brasilconnect-minimal-api-did-net)  
+   - Internacionais via [**WorldTel**](https://github.com/danhpaiva/partner-worldtel-mvc-api-did-net)
 
 2. **Consultar status de ativação de DIDs**  
 
