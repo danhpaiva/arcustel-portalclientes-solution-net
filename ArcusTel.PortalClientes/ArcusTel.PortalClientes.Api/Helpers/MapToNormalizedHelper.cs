@@ -4,9 +4,6 @@ namespace ArcusTel.PortalClientes.Api.Helpers;
 
 public static class MapToNormalizedHelper
 {
-    /// <summary>
-    /// Mapeamento da API PartnerBrasil → Normalizado.
-    /// </summary>
     public static NormalizedDidResponse FromPartnerBrasil(PartnerBrasilDidResponse partner)
     {
         return new NormalizedDidResponse
@@ -19,9 +16,6 @@ public static class MapToNormalizedHelper
         };
     }
 
-    /// <summary>
-    /// Mapeamento da API WorldTel → Normalizado.
-    /// </summary>
     public static NormalizedDidResponse FromWorldTel(WorldTelDidResponse partner)
     {
         return new NormalizedDidResponse
@@ -29,7 +23,7 @@ public static class MapToNormalizedHelper
             DidNumber = partner.E164Number,
             Partner = "WorldTel",
             Status = PartnerStatusHelper.ExtractPartnerStatus("WorldTel", partner.Status),
-            ErrorMessage = null, // WorldTel não envia errorMessage no sample
+            ErrorMessage = null,
             CreatedAt = partner.CreatedAt
         };
     }
