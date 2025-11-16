@@ -12,4 +12,5 @@ public class AppDbContext : DbContext
     public DbSet<ArcusTel.PortalClientes.Api.Models.DidActivationRequest> TB_DidActivationRequest { get; set; } = default!;
     public DbSet<ArcusTel.PortalClientes.Api.Models.PartnerResponseLog> TB_PartnerResponseLog { get; set; } = default!;
     public DbSet<ArcusTel.PortalClientes.Api.Models.PartnerStatusMapping> TB_PartnerStatusMapping { get; set; } = default!;
+    public DbSet<ArcusTel.PortalClientes.Api.Models.User> TB_User { get; set; } = default!;
 }
